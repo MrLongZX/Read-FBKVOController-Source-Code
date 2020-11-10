@@ -509,7 +509,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   NSMutableSet *infos = [_objectInfosMap objectForKey:object];
 
   // check for info existence
-  // 检查集合中是否已经存在info
+  // 检查集合中是否已经存在info,即是否已经存在对object的keypath的观察
   _FBKVOInfo *existingInfo = [infos member:info];
   if (nil != existingInfo) {
     // observation info already exists; do not observe it again
@@ -521,6 +521,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   }
 
   // lazilly create set of infos
+  // 如果集合infos为nil,即还没有对object的属性添加过观察者
   if (nil == infos) {
     // 初始化集合infos
     infos = [NSMutableSet set];
@@ -626,7 +627,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   _FBKVOInfo *info = [[_FBKVOInfo alloc] initWithController:self keyPath:keyPath options:options block:block];
 
   // observe object with info
-  //
+  // 通过info对object添加观察
   [self _observe:object info:info];
 }
 
