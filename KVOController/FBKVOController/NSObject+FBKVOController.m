@@ -26,10 +26,13 @@ static void *NSObjectKVOControllerNonRetainingKey = &NSObjectKVOControllerNonRet
 
 - (FBKVOController *)KVOController
 {
+  // 通过管理对象,获取KVOController对象
   id controller = objc_getAssociatedObject(self, NSObjectKVOControllerKey);
   
   // lazily create the KVOController
+  // 如果没有
   if (nil == controller) {
+    // 进行初始化,并存储起来
     controller = [FBKVOController controllerWithObserver:self];
     self.KVOController = controller;
   }
@@ -39,14 +42,18 @@ static void *NSObjectKVOControllerNonRetainingKey = &NSObjectKVOControllerNonRet
 
 - (void)setKVOController:(FBKVOController *)KVOController
 {
+  // 通过管理对象对 KVOController 对象进行存储
   objc_setAssociatedObject(self, NSObjectKVOControllerKey, KVOController, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 - (FBKVOController *)KVOControllerNonRetaining
 {
+  // 通过管理对象,获取KVOControllerNonRetaining对象
   id controller = objc_getAssociatedObject(self, NSObjectKVOControllerNonRetainingKey);
   
+  // 如果没有
   if (nil == controller) {
+    // 进行初始化,并存储起来
     controller = [[FBKVOController alloc] initWithObserver:self retainObserved:NO];
     self.KVOControllerNonRetaining = controller;
   }
@@ -56,6 +63,7 @@ static void *NSObjectKVOControllerNonRetainingKey = &NSObjectKVOControllerNonRet
 
 - (void)setKVOControllerNonRetaining:(FBKVOController *)KVOControllerNonRetaining
 {
+  // 通过管理对象对 KVOControllerNonRetaining 对象进行存储
   objc_setAssociatedObject(self, NSObjectKVOControllerNonRetainingKey, KVOControllerNonRetaining, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 

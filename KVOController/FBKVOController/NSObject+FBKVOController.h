@@ -26,6 +26,7 @@ NS_ASSUME_NONNULL_BEGIN
  @return FBKVOController associated with this object, creating one if necessary
  @discussion This makes it convenient to simply create and forget a FBKVOController, and when this object gets dealloc'd, so will the associated controller and the observation info.
  */
+// 使用时会持有被观察的对象
 @property (nonatomic, strong) FBKVOController *KVOController;
 
 /**
@@ -35,6 +36,7 @@ NS_ASSUME_NONNULL_BEGIN
  Use this version when a strong reference between controller and observed object would create a retain cycle.
  When not retaining observed objects, special care must be taken to remove observation info prior to deallocation of the observed object.
  */
+// 使用时并不会持有被观察的对象
 @property (nonatomic, strong) FBKVOController *KVOControllerNonRetaining;
 
 @end

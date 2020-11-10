@@ -99,18 +99,21 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
  @abstract The key-value observation info.
  @discussion Object equality is only used within the scope of a controller instance. Safely omit controller from equality definition.
  */
+// 作用是作为一个数据结构
 @interface _FBKVOInfo : NSObject
 @end
 
 @implementation _FBKVOInfo
 {
 @public
+  // 弱持有_controller
   __weak FBKVOController *_controller;
   NSString *_keyPath;
   NSKeyValueObservingOptions _options;
   SEL _action;
   void *_context;
   FBKVONotificationBlock _block;
+  // 当前的 KVO 状态
   _FBKVOInfoState _state;
 }
 
@@ -121,6 +124,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
                             action:(nullable SEL)action
                            context:(nullable void *)context
 {
+  // 初始化,保存参数
   self = [super init];
   if (nil != self) {
     _controller = controller;
@@ -153,11 +157,14 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   return [self initWithController:controller keyPath:keyPath options:0 block:NULL action:NULL context:NULL];
 }
 
+// 覆写对象hash方法
 - (NSUInteger)hash
 {
   return [_keyPath hash];
 }
 
+// 覆写对象isEqual方法
+// 用于对象之间的判等以及方便 NSMapTable 的存储
 - (BOOL)isEqual:(id)object
 {
   if (nil == object) {
@@ -172,6 +179,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   return [_keyPath isEqualToString:((_FBKVOInfo *)object)->_keyPath];
 }
 
+// 覆写debugDescription方法
 - (NSString *)debugDescription
 {
   NSMutableString *s = [NSMutableString stringWithFormat:@"<%@:%p keyPath:%@", NSStringFromClass([self class]), self, _keyPath];
@@ -221,6 +229,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   pthread_mutex_t _mutex;
 }
 
+// 初始化单例
 + (instancetype)sharedController
 {
   static _FBKVOSharedController *_controller = nil;
@@ -237,6 +246,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   if (nil != self) {
     NSHashTable *infos = [NSHashTable alloc];
 #ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
+    // 对存储的对象为弱引用
     _infos = [infos initWithOptions:NSPointerFunctionsWeakMemory|NSPointerFunctionsObjectPointerPersonality capacity:0];
 #elif defined(__MAC_OS_X_VERSION_MIN_REQUIRED)
     if ([NSHashTable respondsToSelector:@selector(weakObjectsHashTable)]) {
@@ -250,6 +260,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
     }
 
 #endif
+    // 初始化锁
     pthread_mutex_init(&_mutex, NULL);
   }
   return self;
@@ -288,20 +299,26 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   }
 
   // register info
+  // 加锁
   pthread_mutex_lock(&_mutex);
+  // 保存到hashtable中
   [_infos addObject:info];
+  // 解锁
   pthread_mutex_unlock(&_mutex);
 
   // add observer
+  // 对 object 添加观察者
   [object addObserver:self forKeyPath:info->_keyPath options:info->_options context:(void *)info];
 
   if (info->_state == _FBKVOInfoStateInitial) {
+    // 设置观察状态为进行中
     info->_state = _FBKVOInfoStateObserving;
   } else if (info->_state == _FBKVOInfoStateNotObserving) {
     // this could happen when `NSKeyValueObservingOptionInitial` is one of the NSKeyValueObservingOptions,
     // and the observer is unregistered within the callback block.
     // at this time the object has been registered as an observer (in Foundation KVO),
     // so we can safely unobserve it.
+    // 移除观察者
     [object removeObserver:self forKeyPath:info->_keyPath context:(void *)info];
   }
 }
@@ -314,10 +331,11 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 
   // unregister info
   pthread_mutex_lock(&_mutex);
+  // info从hashtable中移除
   [_infos removeObject:info];
   pthread_mutex_unlock(&_mutex);
 
-  // remove observer
+  // remove observer 移除观察者
   if (info->_state == _FBKVOInfoStateObserving) {
     [object removeObserver:self forKeyPath:info->_keyPath context:(void *)info];
   }
@@ -358,6 +376,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   {
     // lookup context in registered infos, taking out a strong reference only if it exists
     pthread_mutex_lock(&_mutex);
+    // 根据context从hashtable中获取info
     info = [_infos member:(__bridge id)context];
     pthread_mutex_unlock(&_mutex);
   }
@@ -365,29 +384,37 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   if (nil != info) {
 
     // take strong reference to controller
+    // 获取info中的FBKVOController对象
     FBKVOController *controller = info->_controller;
     if (nil != controller) {
 
       // take strong reference to observer
+      // 获取FBKVOController对象中observer
       id observer = controller.observer;
       if (nil != observer) {
 
         // dispatch custom block or action, fall back to default action
+        // 传入了block回调
         if (info->_block) {
           NSDictionary<NSKeyValueChangeKey, id> *changeWithKeyPath = change;
           // add the keyPath to the change dictionary for clarity when mulitple keyPaths are being observed
+          // 当观察到多个关键路径时，将keyPath添加到更改字典中以保持清晰
           if (keyPath) {
             NSMutableDictionary<NSString *, id> *mChange = [NSMutableDictionary dictionaryWithObject:keyPath forKey:FBKVONotificationKeyPathKey];
             [mChange addEntriesFromDictionary:change];
             changeWithKeyPath = [mChange copy];
           }
+          // 调用block
           info->_block(observer, object, changeWithKeyPath);
+        // 传入了调用方法
         } else if (info->_action) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+          // 调用传入的方法
           [observer performSelector:info->_action withObject:change withObject:object];
 #pragma clang diagnostic pop
         } else {
+          // 直接调用观察者 KVO 回调方法
           [observer observeValueForKeyPath:keyPath ofObject:object change:change context:info->_context];
         }
       }
@@ -416,9 +443,13 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 {
   self = [super init];
   if (nil != self) {
+    // 弱持有观察者
     _observer = observer;
+    // 判断retainObserved,决定是否持有作为key的observer,使其引用计数加1
     NSPointerFunctionsOptions keyOptions = retainObserved ? NSPointerFunctionsStrongMemory|NSPointerFunctionsObjectPointerPersonality : NSPointerFunctionsWeakMemory|NSPointerFunctionsObjectPointerPersonality;
+    // 初始化maptable
     _objectInfosMap = [[NSMapTable alloc] initWithKeyOptions:keyOptions valueOptions:NSPointerFunctionsStrongMemory|NSPointerFunctionsObjectPersonality capacity:0];
+    // 初始化锁
     pthread_mutex_init(&_lock, NULL);
   }
   return self;
@@ -431,7 +462,9 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 
 - (void)dealloc
 {
+  // 移除所有观察者
   [self unobserveAll];
+  // 销毁锁
   pthread_mutex_destroy(&_lock);
 }
 
@@ -469,31 +502,37 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 
 - (void)_observe:(id)object info:(_FBKVOInfo *)info
 {
-  // lock
+  // lock 加锁
   pthread_mutex_lock(&_lock);
 
+  // 从maptable中根据object获取集合infos
   NSMutableSet *infos = [_objectInfosMap objectForKey:object];
 
   // check for info existence
+  // 检查集合中是否已经存在info
   _FBKVOInfo *existingInfo = [infos member:info];
   if (nil != existingInfo) {
     // observation info already exists; do not observe it again
 
     // unlock and return
+    // 如果已经存在,解锁,返回
     pthread_mutex_unlock(&_lock);
     return;
   }
 
   // lazilly create set of infos
   if (nil == infos) {
+    // 初始化集合infos
     infos = [NSMutableSet set];
+    // 将集合infos与object添加到maptable中
     [_objectInfosMap setObject:infos forKey:object];
   }
 
   // add info and oberve
+  // 将参数info添加到集合infos中
   [infos addObject:info];
 
-  // unlock prior to callout
+  // unlock prior to callout 解锁
   pthread_mutex_unlock(&_lock);
 
   [[_FBKVOSharedController sharedController] observe:object info:info];
@@ -504,17 +543,20 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   // lock
   pthread_mutex_lock(&_lock);
 
-  // get observation infos
+  // get observation infos 获取观察集合infos
   NSMutableSet *infos = [_objectInfosMap objectForKey:object];
-
-  // lookup registered info instance
+ 
+  // lookup registered info instance 获取保存了的info对象 (用到了_FBKVOInfo覆写的isEqual方法)
   _FBKVOInfo *registeredInfo = [infos member:info];
 
+  // 如果 registeredInfo 不为空
   if (nil != registeredInfo) {
+    // 移除保存的registeredInfo信息
     [infos removeObject:registeredInfo];
 
-    // remove no longer used infos
+    // remove no longer used infos 如果集合infos为空
     if (0 == infos.count) {
+      // 将object从maptable中移除
       [_objectInfosMap removeObjectForKey:object];
     }
   }
@@ -522,7 +564,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   // unlock
   pthread_mutex_unlock(&_lock);
 
-  // unobserve
+  // unobserve 移除观察
   [[_FBKVOSharedController sharedController] unobserve:object info:registeredInfo];
 }
 
@@ -548,9 +590,11 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   // lock
   pthread_mutex_lock(&_lock);
 
+  // 拷贝maptable
   NSMapTable *objectInfoMaps = [_objectInfosMap copy];
 
   // clear table and map
+  // 清空持有的maptable
   [_objectInfosMap removeAllObjects];
 
   // unlock
@@ -560,7 +604,9 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 
   for (id object in objectInfoMaps) {
     // unobserve each registered object and infos
+    // 根据object获取集合infos
     NSSet *infos = [objectInfoMaps objectForKey:object];
+    // 移除观察者
     [shareController unobserve:object infos:infos];
   }
 }
@@ -570,14 +616,17 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 - (void)observe:(nullable id)object keyPath:(NSString *)keyPath options:(NSKeyValueObservingOptions)options block:(FBKVONotificationBlock)block
 {
   NSAssert(0 != keyPath.length && NULL != block, @"missing required parameters observe:%@ keyPath:%@ block:%p", object, keyPath, block);
+  // 判断参数
   if (nil == object || 0 == keyPath.length || NULL == block) {
     return;
   }
 
   // create info
+  // 创建info对象
   _FBKVOInfo *info = [[_FBKVOInfo alloc] initWithController:self keyPath:keyPath options:options block:block];
 
   // observe object with info
+  //
   [self _observe:object info:info];
 }
 
@@ -648,12 +697,13 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   }
 }
 
+// 手动移除观察者
 - (void)unobserve:(nullable id)object keyPath:(NSString *)keyPath
 {
-  // create representative info
+  // create representative info 创建一个代表info
   _FBKVOInfo *info = [[_FBKVOInfo alloc] initWithController:self keyPath:keyPath];
 
-  // unobserve object property
+  // unobserve object property 移除观察
   [self _unobserve:object info:info];
 }
 
@@ -668,6 +718,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 
 - (void)unobserveAll
 {
+  // 移除所有观察者
   [self _unobserveAll];
 }
 
