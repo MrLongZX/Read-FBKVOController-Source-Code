@@ -301,7 +301,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   // register info
   // 加锁
   pthread_mutex_lock(&_mutex);
-  // 保存到hashtable中
+  // 保存到hashtable中,弱持有info对象
   [_infos addObject:info];
   // 解锁
   pthread_mutex_unlock(&_mutex);
@@ -351,11 +351,12 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   // unregister info
   pthread_mutex_lock(&_mutex);
   for (_FBKVOInfo *info in infos) {
+    // 先从hashtable中移除
     [_infos removeObject:info];
   }
   pthread_mutex_unlock(&_mutex);
 
-  // remove observer
+  // remove observer 移除观察者
   for (_FBKVOInfo *info in infos) {
     if (info->_state == _FBKVOInfoStateObserving) {
       [object removeObserver:self forKeyPath:info->_keyPath context:(void *)info];
@@ -384,12 +385,12 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   if (nil != info) {
 
     // take strong reference to controller
-    // 获取info中的FBKVOController对象
+    // 获取info中的FBKVOController对象,info对_controller是弱持有
     FBKVOController *controller = info->_controller;
     if (nil != controller) {
 
       // take strong reference to observer
-      // 获取FBKVOController对象中observer
+      // 获取FBKVOController对象中observer,FBKVOController对象对observer是弱持有,observer可能已经被销毁
       id observer = controller.observer;
       if (nil != observer) {
 
@@ -428,7 +429,9 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 
 @implementation FBKVOController
 {
+  // key:观察的object对象  value:需要观察的object对象的多个keypath构造而成的_FBKVOInfo对象的集合
   NSMapTable<id, NSMutableSet<_FBKVOInfo *> *> *_objectInfosMap;
+  // 互斥锁
   pthread_mutex_t _lock;
 }
 
@@ -530,7 +533,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   }
 
   // add info and oberve
-  // 将参数info添加到集合infos中
+  // 将参数info添加到集合infos中, 集合infos是观察一个对象多个keypath,对应构造的多个info的集合
   [infos addObject:info];
 
   // unlock prior to callout 解锁
@@ -539,6 +542,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   [[_FBKVOSharedController sharedController] observe:object info:info];
 }
 
+// 移除object对象的某个keypath的观察者
 - (void)_unobserve:(id)object info:(_FBKVOInfo *)info
 {
   // lock
@@ -605,7 +609,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 
   for (id object in objectInfoMaps) {
     // unobserve each registered object and infos
-    // 根据object获取集合infos
+    // 根据object获取集合infos,即取出对object对象观察的多个keypath,构造的多个info的集合
     NSSet *infos = [objectInfoMaps objectForKey:object];
     // 移除观察者
     [shareController unobserve:object infos:infos];
@@ -639,6 +643,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
     return;
   }
 
+  // 遍历keypath集合,循环调用上一个方法
   for (NSString *keyPath in keyPaths) {
     [self observe:object keyPath:keyPath options:options block:block];
   }
@@ -698,7 +703,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   }
 }
 
-// 手动移除观察者
+// 移除对object对象的keypath属性的观察者
 - (void)unobserve:(nullable id)object keyPath:(NSString *)keyPath
 {
   // create representative info 创建一个代表info
@@ -708,6 +713,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   [self _unobserve:object info:info];
 }
 
+// 移除对object对象的所有keypath的观察者
 - (void)unobserve:(nullable id)object
 {
   if (nil == object) {
