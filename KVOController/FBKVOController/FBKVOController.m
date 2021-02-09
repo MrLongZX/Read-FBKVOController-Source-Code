@@ -113,7 +113,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   SEL _action;
   void *_context;
   FBKVONotificationBlock _block;
-  // 当前的 KVO 状态
+  // 当前的 KVO 状态，默认为_FBKVOInfoStateInitial
   _FBKVOInfoState _state;
 }
 
@@ -203,6 +203,8 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
 
 #pragma mark _FBKVOSharedController -
 
+// 共享的KVO控制器实例
+// 充当接待员，接收和转发KVO通知
 /**
  @abstract The shared KVO controller instance.
  @discussion Acts as a receptionist, receiving and forwarding KVO notifications.
@@ -528,7 +530,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   if (nil == infos) {
     // 初始化集合infos
     infos = [NSMutableSet set];
-    // 将集合infos与object添加到maptable中
+    // 将集合infos与被观察者object添加到maptable中
     [_objectInfosMap setObject:infos forKey:object];
   }
 
@@ -631,7 +633,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   _FBKVOInfo *info = [[_FBKVOInfo alloc] initWithController:self keyPath:keyPath options:options block:block];
 
   // observe object with info
-  // 通过info对object添加观察
+  // 保存被观察者object对象和对应的info对象
   [self _observe:object info:info];
 }
 
