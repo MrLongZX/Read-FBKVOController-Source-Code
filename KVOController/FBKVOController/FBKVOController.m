@@ -113,7 +113,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   SEL _action;
   void *_context;
   FBKVONotificationBlock _block;
-  // 当前的 KVO 状态，默认为_FBKVOInfoStateInitial
+  // 当前的KVO状态，默认为_FBKVOInfoStateInitial
   _FBKVOInfoState _state;
 }
 
@@ -303,7 +303,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   // register info
   // 加锁
   pthread_mutex_lock(&_mutex);
-  // 保存到hashtable中,弱持有info对象
+  // 保存到hashtable中，弱持有info对象
   [_infos addObject:info];
   // 解锁
   pthread_mutex_unlock(&_mutex);
@@ -387,12 +387,12 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   if (nil != info) {
 
     // take strong reference to controller
-    // 获取info中的FBKVOController对象,info对_controller是弱持有
+    // 获取info中的FBKVOController对象，info对_controller是弱持有
     FBKVOController *controller = info->_controller;
     if (nil != controller) {
 
       // take strong reference to observer
-      // 获取FBKVOController对象中observer,FBKVOController对象对observer是弱持有,observer可能已经被销毁
+      // 获取FBKVOController对象中的观察者observer，FBKVOController对象对observer是弱持有,observer可能已经被销毁
       id observer = controller.observer;
       if (nil != observer) {
 
@@ -450,9 +450,11 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   if (nil != self) {
     // 弱持有观察者
     _observer = observer;
-    // 判断retainObserved,决定是否持有作为key的observer,使其引用计数加1
+    // 判断retainObserved，决定是否持有作为key的observer，使其引用计数加1
+    // NSPointerFunctionsObjectPointerPersonality : isEqual和hash比较的是指针的地址
     NSPointerFunctionsOptions keyOptions = retainObserved ? NSPointerFunctionsStrongMemory|NSPointerFunctionsObjectPointerPersonality : NSPointerFunctionsWeakMemory|NSPointerFunctionsObjectPointerPersonality;
     // 初始化maptable
+    // NSPointerFunctionsObjectPersonality : isEqual和hash比较的是－description方法的值
     _objectInfosMap = [[NSMapTable alloc] initWithKeyOptions:keyOptions valueOptions:NSPointerFunctionsStrongMemory|NSPointerFunctionsObjectPersonality capacity:0];
     // 初始化锁
     pthread_mutex_init(&_lock, NULL);
@@ -514,7 +516,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   NSMutableSet *infos = [_objectInfosMap objectForKey:object];
 
   // check for info existence
-  // 检查集合中是否已经存在info,即是否已经存在对object的keypath的观察
+  // 检查集合中是否已经存在info，即是否已经存在对object的keypath的观察
   _FBKVOInfo *existingInfo = [infos member:info];
   if (nil != existingInfo) {
     // observation info already exists; do not observe it again
@@ -535,7 +537,7 @@ NSString *const FBKVONotificationKeyPathKey = @"FBKVONotificationKeyPathKey";
   }
 
   // add info and oberve
-  // 将参数info添加到集合infos中, 集合infos是观察一个对象多个keypath,对应构造的多个info的集合
+  // 将参数info添加到集合infos中, 集合infos是观察一个对象多个keypath，对应构造的多个info的集合
   [infos addObject:info];
 
   // unlock prior to callout 解锁
